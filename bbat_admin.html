@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B-BAT · Panel de sucursales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#14181A; --surface:#1E2426; --surface-2:#262D30; --border:#333B3E;
+    --amber:#F2A623; --amber-dim:#7A5A1A; --coral:#D8433A; --turf:#4C9A5B; --turf-dim:#274A2F;
+    --text:#F2F0E8; --text-dim:#9A9E96; --text-faint:#61686A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  h1,h2,h3,.disp{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.03em;}
+  .mono{font-family:'Roboto Mono',monospace;}
+  #pin-gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;}
+  #pin-gate .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 28px;width:280px;text-align:center;}
+  #pin-gate h1{font-size:20px;color:var(--amber);margin:0 0 4px;}
+  #pin-gate p{color:var(--text-dim);font-size:13px;margin:0 0 20px;}
+  #pin-gate input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:20px;letter-spacing:.3em;text-align:center;padding:10px;font-family:'Roboto Mono',monospace;}
+  #pin-gate button{margin-top:14px;width:100%;background:var(--amber);color:#1a1400;border:none;border-radius:8px;padding:10px;font-weight:600;font-size:14px;cursor:pointer;}
+  #pin-error{color:var(--coral);font-size:12px;margin-top:8px;min-height:16px;}
+  #app{display:none;max-width:960px;margin:0 auto;padding:20px 16px 60px;}
+  header.top{display:flex;align-items:center;gap:12px;padding:6px 0 20px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+  header.top .logo{width:36px;height:36px;border-radius:8px;background:var(--amber);color:#1a1400;display:flex;align-items:center;justify-content:center;font-family:'Oswald';font-weight:700;font-size:16px;}
+  header.top h1{font-size:18px;margin:0;color:var(--text);}
+  header.top span{color:var(--text-faint);font-size:12px;}
+  nav.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+  nav.tabs button{background:none;border:none;color:var(--text-dim);font-family:'Oswald';font-size:13px;letter-spacing:.04em;text-transform:uppercase;padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;}
+  nav.tabs button.active{color:var(--amber);border-bottom-color:var(--amber);}
+  .sucursal-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
+  .sucursal-tabs button{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;}
+  .sucursal-tabs button.active{background:var(--amber);border-color:var(--amber);color:#1a1400;font-weight:600;}
+  .section-head{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px;}
+  .section-head h2{font-size:14px;color:var(--text-dim);margin:0;}
+  .btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Inter';}
+  .btn:hover{border-color:var(--amber);}
+  .btn-primary{background:var(--amber);border-color:var(--amber);color:#1a1400;font-weight:600;}
+  .btn-danger{background:transparent;border-color:var(--coral);color:var(--coral);}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+  .card-list{display:flex;flex-direction:column;gap:8px;}
+  .item-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+  .item-card.off{opacity:.45;}
+  .item-card .info{flex:1;min-width:0;}
+  .item-card .name{font-weight:600;font-size:14px;}
+  .item-card .desc{color:var(--text-dim);font-size:12px;margin-top:2px;}
+  .price-chip{font-family:'Roboto Mono';font-weight:700;background:#0F1112;border:1px solid var(--border);color:var(--amber);border-radius:6px;padding:4px 10px;font-size:13px;white-space:nowrap;}
+  .day-chip{font-family:'Roboto Mono';font-weight:500;background:var(--turf-dim);color:#B7E3C0;border-radius:6px;padding:4px 10px;font-size:11px;white-space:nowrap;}
+  .actions{display:flex;gap:6px;}
+  .icon-btn{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:16px;padding:4px;}
+  .icon-btn:hover{color:var(--amber);}
+  .empty{color:var(--text-faint);font-size:13px;padding:30px 0;text-align:center;}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:40;padding:20px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;}
+  .modal h3{margin:0 0 16px;font-size:16px;color:var(--amber);}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 10px;font-size:13px;font-family:'Inter';}
+  .field textarea{resize:vertical;min-height:50px;}
+  .field-check{display:flex;align-items:center;gap:8px;}
+  .field-check label{margin:0;color:var(--text);font-size:13px;}
+  .modal-actions{display:flex;gap:8px;margin-top:18px;}
+  .modal-actions .btn{flex:1;}
+  .copy-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;margin:12px 0;}
+  .copy-row{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:13px;}
+  .copy-row span{flex:1;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface-2);border:1px solid var(--amber);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:60;}
+  .toast.show{opacity:1;}
+  .cat-label{font-size:11px;color:var(--text-faint);letter-spacing:.08em;text-transform:uppercase;margin:16px 0 6px;font-family:'Oswald';}
+</style>
+</head>
+<body>
+
+<div id="pin-gate">
+  <div class="box">
+    <h1>B-BAT ⚾</h1>
+    <p>Panel de sucursales — ingresa tu PIN</p>
+    <input type="password" id="pin-input" maxlength="6" inputmode="numeric" autofocus>
+    <button onclick="checkPin()">Entrar</button>
+    <div id="pin-error"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <div class="logo">B</div>
+    <div>
+      <h1>Panel de sucursales</h1>
+      <span>Menú y promociones · en vivo desde Supabase</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="menu" onclick="switchTab('menu')">Menú</button>
+    <button class="tab-btn" data-tab="promos" onclick="switchTab('promos')">Promociones</button>
+  </nav>
+
+  <div id="sucursal-tabs" class="sucursal-tabs"></div>
+
+  <div id="tab-menu">
+    <div class="section-head">
+      <h2 id="menu-count"></h2>
+      <div class="actions">
+        <button class="btn btn-sm" onclick="openCopyModal()">Copiar de otra sucursal</button>
+        <button class="btn btn-primary btn-sm" onclick="openItemModal('comida')">+ Producto</button>
+      </div>
+    </div>
+    <div id="menu-comida"></div>
+    <div id="menu-bebida"></div>
+  </div>
+
+  <div id="tab-promos" style="display:none">
+    <div class="section-head">
+      <h2 id="promo-count"></h2>
+      <button class="btn btn-primary btn-sm" onclick="openPromoModal()">+ Promoción</button>
+    </div>
+    <div id="promo-list" class="card-list"></div>
+  </div>
+</div>
+
+<!-- Modal: producto de menú -->
+<div class="modal-bg" id="item-modal-bg">
+  <div class="modal">
+    <h3 id="item-modal-title">Nuevo producto</h3>
+    <input type="hidden" id="item-id">
+    <div class="field">
+      <label>Categoría</label>
+      <select id="item-categoria"><option value="comida">Comida</option><option value="bebida">Bebida</option></select>
+    </div>
+    <div class="field"><label>Nombre</label><input id="item-nombre" placeholder="Ej. Hamburguesa clásica"></div>
+    <div class="field"><label>Descripción</label><textarea id="item-descripcion" placeholder="Ej. Carne, queso, lechuga, tomate"></textarea></div>
+    <div class="field"><label>Precio (MXN)</label><input id="item-precio" type="number" step="0.01" placeholder="145.00"></div>
+    <div class="field field-check"><input type="checkbox" id="item-disponible" checked><label for="item-disponible">Disponible</label></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('item-modal-bg')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveItem()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: promoción -->
+<div class="modal-bg" id="promo-modal-bg">
+  <div class="modal">
+    <h3 id="promo-modal-title">Nueva promoción</h3>
+    <input type="hidden" id="promo-id">
+    <div class="field"><label>Descripción</label><input id="promo-descripcion" placeholder="Ej. Martes de Hamburguesas"></div>
+    <div class="field">
+      <label>URL de imagen (link de descarga de Kommo)</label>
+      <input id="promo-imagen" placeholder="https://drive-g.kommo.com/download/..." oninput="document.getElementById('promo-imagen-preview').src=this.value; document.getElementById('promo-imagen-preview').style.display = this.value ? 'block' : 'none';">
+      <div style="font-size:11px;color:var(--text-faint);margin-top:5px;">Sube la foto a un chat de Kommo (o a la Media de un lead) y pega aquí su link de descarga. La subida automática desde este panel está en construcción.</div>
+      <img id="promo-imagen-preview" style="max-width:100%;border-radius:8px;margin-top:8px;display:none;">
+    </div>
+    <div class="field">
+      <label>Día</label>
+      <select id="promo-dia">
+        <option value="">Todos los días</option>
+        <option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option>
+        <option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábado</option><option value="7">Domingo</option>
+      </select>
+    </div>
+    <div class="field field-check"><input type="checkbox" id="promo-activo" checked><label for="promo-activo">Activa</label></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('promo-modal-bg')">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePromo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: copiar menú -->
+<div class="modal-bg" id="copy-modal-bg">
+  <div class="modal">
+    <h3>Copiar menú de otra sucursal</h3>
+    <div class="field">
+      <label>Copiar desde</label>
+      <select id="copy-source" onchange="loadCopySource()"></select>
+    </div>
+    <div id="copy-list" class="copy-list"><p class="empty">Elige una sucursal de origen</p></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('copy-modal-bg')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmCopy()">Copiar seleccionados</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://bfyrxykuaqxvbqtjojoe.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_-GR7EQQNff83-1KnqnPFFg_-ZrvVZGY';
+const PIN = '6734';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let sucursales = [];
+let currentSucursal = null;
+let currentTab = 'menu';
+let copySourceItems = [];
+
+function checkPin(){
+  const val = document.getElementById('pin-input').value;
+  if(val === PIN){
+    document.getElementById('pin-gate').style.display='none';
+    document.getElementById('app').style.display='block';
+    boot();
+  } else {
+    document.getElementById('pin-error').textContent = 'PIN incorrecto';
+  }
+}
+document.getElementById('pin-input').addEventListener('keydown', e => { if(e.key==='Enter') checkPin(); });
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+async function boot(){
+  const { data, error } = await sb.from('bbat_sucursales').select('*').order('es_generica').order('nombre');
+  if(error){ showToast('Error cargando sucursales'); return; }
+  sucursales = data;
+  renderSucursalTabs();
+  if(sucursales.length){ selectSucursal(sucursales.find(s=>!s.es_generica)?.id || sucursales[0].id); }
+}
+
+function renderSucursalTabs(){
+  const el = document.getElementById('sucursal-tabs');
+  el.innerHTML = sucursales.map(s => `<button class="${s.id===currentSucursal?'active':''}" onclick="selectSucursal(${s.id})">${s.nombre}${s.es_generica?' (genérico)':''}</button>`).join('');
+}
+
+function selectSucursal(id){
+  currentSucursal = id;
+  renderSucursalTabs();
+  if(currentTab==='menu') loadMenu(); else loadPromos();
+}
+
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('tab-menu').style.display = tab==='menu' ? 'block':'none';
+  document.getElementById('tab-promos').style.display = tab==='promos' ? 'block':'none';
+  if(tab==='menu') loadMenu(); else loadPromos();
+}
+
+// ---------- MENU ----------
+async function loadMenu(){
+  const { data, error } = await sb.from('bbat_menu_items').select('*').eq('sucursal_id', currentSucursal).order('categoria').order('nombre');
+  if(error){ showToast('Error cargando menú'); return; }
+  document.getElementById('menu-count').textContent = data.length + (data.length===1?' producto':' productos');
+  renderMenuGroup('comida', data.filter(i=>i.categoria==='comida'));
+  renderMenuGroup('bebida', data.filter(i=>i.categoria==='bebida'));
+}
+
+function renderMenuGroup(cat, items){
+  const el = document.getElementById('menu-'+cat);
+  const label = cat==='comida' ? '🍔 Comida' : '🥤 Bebidas';
+  if(!items.length){ el.innerHTML = `<div class="cat-label">${label}</div><p class="empty">Sin productos</p>`; return; }
+  el.innerHTML = `<div class="cat-label">${label}</div><div class="card-list">` + items.map(i => `
+    <div class="item-card ${i.disponible?'':'off'}">
+      <div class="info">
+        <div class="name">${escapeHtml(i.nombre)}</div>
+        ${i.descripcion?`<div class="desc">${escapeHtml(i.descripcion)}</div>`:''}
+      </div>
+      <div class="price-chip">$${Number(i.precio||0).toFixed(2)}</div>
+      <div class="actions">
+        <button class="icon-btn" title="${i.disponible?'Marcar no disponible':'Marcar disponible'}" onclick="toggleDisponible(${i.id}, ${!i.disponible})">${i.disponible?'●':'○'}</button>
+        <button class="icon-btn" onclick='editItem(${JSON.stringify(i)})'>✎</button>
+        <button class="icon-btn" onclick="deleteItem(${i.id})">✕</button>
+      </div>
+    </div>`).join('') + `</div>`;
+}
+
+function openItemModal(defaultCat){
+  document.getElementById('item-modal-title').textContent = 'Nuevo producto';
+  document.getElementById('item-id').value = '';
+  document.getElementById('item-categoria').value = defaultCat || 'comida';
+  document.getElementById('item-nombre').value = '';
+  document.getElementById('item-descripcion').value = '';
+  document.getElementById('item-precio').value = '';
+  document.getElementById('item-disponible').checked = true;
+  document.getElementById('item-modal-bg').classList.add('show');
+}
+function editItem(i){
+  document.getElementById('item-modal-title').textContent = 'Editar producto';
+  document.getElementById('item-id').value = i.id;
+  document.getElementById('item-categoria').value = i.categoria;
+  document.getElementById('item-nombre').value = i.nombre;
+  document.getElementById('item-descripcion').value = i.descripcion || '';
+  document.getElementById('item-precio').value = i.precio;
+  document.getElementById('item-disponible').checked = i.disponible;
+  document.getElementById('item-modal-bg').classList.add('show');
+}
+async function saveItem(){
+  const id = document.getElementById('item-id').value;
+  const payload = {
+    sucursal_id: currentSucursal,
+    categoria: document.getElementById('item-categoria').value,
+    nombre: document.getElementById('item-nombre').value.trim(),
+    descripcion: document.getElementById('item-descripcion').value.trim(),
+    precio: parseFloat(document.getElementById('item-precio').value) || 0,
+    disponible: document.getElementById('item-disponible').checked,
+    updated_at: new Date().toISOString()
+  };
+  if(!payload.nombre){ showToast('Falta el nombre'); return; }
+  const { error } = id ? await sb.from('bbat_menu_items').update(payload).eq('id', id) : await sb.from('bbat_menu_items').insert(payload);
+  if(error){ showToast('Error al guardar'); return; }
+  closeModal('item-modal-bg'); showToast('Guardado ✓'); loadMenu();
+}
+async function toggleDisponible(id, val){
+  const { error } = await sb.from('bbat_menu_items').update({disponible: val}).eq('id', id);
+  if(error){ showToast('Error'); return; }
+  loadMenu();
+}
+async function deleteItem(id){
+  if(!confirm('¿Eliminar este producto?')) return;
+  const { error } = await sb.from('bbat_menu_items').delete().eq('id', id);
+  if(error){ showToast('Error al eliminar'); return; }
+  showToast('Eliminado'); loadMenu();
+}
+
+// ---------- COPIAR MENU ----------
+function openCopyModal(){
+  const sel = document.getElementById('copy-source');
+  sel.innerHTML = '<option value="">Elige sucursal...</option>' + sucursales.filter(s=>s.id!==currentSucursal).map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  document.getElementById('copy-list').innerHTML = '<p class="empty">Elige una sucursal de origen</p>';
+  document.getElementById('copy-modal-bg').classList.add('show');
+}
+async function loadCopySource(){
+  const srcId = document.getElementById('copy-source').value;
+  const el = document.getElementById('copy-list');
+  if(!srcId){ el.innerHTML = '<p class="empty">Elige una sucursal de origen</p>'; return; }
+  const { data, error } = await sb.from('bbat_menu_items').select('*').eq('sucursal_id', srcId).order('categoria').order('nombre');
+  if(error){ el.innerHTML = '<p class="empty">Error al cargar</p>'; return; }
+  copySourceItems = data;
+  if(!data.length){ el.innerHTML = '<p class="empty">Esa sucursal no tiene productos</p>'; return; }
+  el.innerHTML = data.map(i => `<div class="copy-row"><input type="checkbox" checked data-copy-id="${i.id}"><span>${escapeHtml(i.nombre)} <span style="color:var(--text-faint)">— $${Number(i.precio||0).toFixed(2)}</span></span></div>`).join('');
+}
+async function confirmCopy(){
+  const checked = Array.from(document.querySelectorAll('#copy-list input[type=checkbox]:checked')).map(c=>parseInt(c.dataset.copyId));
+  if(!checked.length){ showToast('Selecciona al menos un producto'); return; }
+  const rows = copySourceItems.filter(i=>checked.includes(i.id)).map(i => ({
+    sucursal_id: currentSucursal, categoria: i.categoria, nombre: i.nombre,
+    descripcion: i.descripcion, precio: i.precio, disponible: i.disponible
+  }));
+  const { error } = await sb.from('bbat_menu_items').insert(rows);
+  if(error){ showToast('Error al copiar'); return; }
+  closeModal('copy-modal-bg'); showToast(`${rows.length} productos copiados ✓`); loadMenu();
+}
+
+// ---------- PROMOCIONES ----------
+const DIAS = {1:'Lunes',2:'Martes',3:'Miércoles',4:'Jueves',5:'Viernes',6:'Sábado',7:'Domingo'};
+async function loadPromos(){
+  const { data, error } = await sb.from('bbat_promociones').select('*').eq('sucursal_id', currentSucursal).order('dia_semana', {nullsFirst:true}).order('descripcion');
+  if(error){ showToast('Error cargando promociones'); return; }
+  document.getElementById('promo-count').textContent = data.length + (data.length===1?' promoción':' promociones');
+  const el = document.getElementById('promo-list');
+  if(!data.length){ el.innerHTML = '<p class="empty">Sin promociones para esta sucursal</p>'; return; }
+  el.innerHTML = data.map(p => `
+    <div class="item-card ${p.activo?'':'off'}">
+      <div class="info">
+        <div class="name">${escapeHtml(p.descripcion)}</div>
+        ${p.imagen_url?`<div class="desc">🖼 imagen cargada</div>`:''}
+      </div>
+      <div class="day-chip">${p.dia_semana ? DIAS[p.dia_semana] : 'Todos los días'}</div>
+      <div class="actions">
+        <button class="icon-btn" title="${p.activo?'Desactivar':'Activar'}" onclick="togglePromoActivo(${p.id}, ${!p.activo})">${p.activo?'●':'○'}</button>
+        <button class="icon-btn" onclick='editPromo(${JSON.stringify(p)})'>✎</button>
+        <button class="icon-btn" onclick="deletePromo(${p.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+function openPromoModal(){
+  document.getElementById('promo-modal-title').textContent = 'Nueva promoción';
+  document.getElementById('promo-id').value = '';
+  document.getElementById('promo-descripcion').value = '';
+  document.getElementById('promo-imagen').value = '';
+  document.getElementById('promo-imagen-preview').style.display = 'none';
+  document.getElementById('promo-dia').value = '';
+  document.getElementById('promo-activo').checked = true;
+  document.getElementById('promo-modal-bg').classList.add('show');
+}
+function editPromo(p){
+  document.getElementById('promo-modal-title').textContent = 'Editar promoción';
+  document.getElementById('promo-id').value = p.id;
+  document.getElementById('promo-descripcion').value = p.descripcion;
+  document.getElementById('promo-imagen').value = p.imagen_url || '';
+  const prev = document.getElementById('promo-imagen-preview');
+  if(p.imagen_url){ prev.src = p.imagen_url; prev.style.display='block'; } else { prev.style.display='none'; }
+  document.getElementById('promo-dia').value = p.dia_semana || '';
+  document.getElementById('promo-activo').checked = p.activo;
+  document.getElementById('promo-modal-bg').classList.add('show');
+}
+async function savePromo(){
+  const id = document.getElementById('promo-id').value;
+  const diaVal = document.getElementById('promo-dia').value;
+  const payload = {
+    sucursal_id: currentSucursal,
+    descripcion: document.getElementById('promo-descripcion').value.trim(),
+    imagen_url: document.getElementById('promo-imagen').value.trim(),
+    dia_semana: diaVal ? parseInt(diaVal) : null,
+    activo: document.getElementById('promo-activo').checked,
+    updated_at: new Date().toISOString()
+  };
+  if(!payload.descripcion){ showToast('Falta la descripción'); return; }
+  const { error } = id ? await sb.from('bbat_promociones').update(payload).eq('id', id) : await sb.from('bbat_promociones').insert(payload);
+  if(error){ showToast(error.message.includes('duplicate') ? 'Ya existe esa promo para ese día' : 'Error al guardar'); return; }
+  closeModal('promo-modal-bg'); showToast('Guardado ✓'); loadPromos();
+}
+async function togglePromoActivo(id, val){
+  const { error } = await sb.from('bbat_promociones').update({activo: val}).eq('id', id);
+  if(error){ showToast('Error'); return; }
+  loadPromos();
+}
+async function deletePromo(id){
+  if(!confirm('¿Eliminar esta promoción?')) return;
+  const { error } = await sb.from('bbat_promociones').delete().eq('id', id);
+  if(error){ showToast('Error al eliminar'); return; }
+  showToast('Eliminada'); loadPromos();
+}
+
+// ---------- utils ----------
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function escapeHtml(str){ return (str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+document.querySelectorAll('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if(e.target===bg) bg.classList.remove('show'); }));
+</script>
+</body>
+</html>
